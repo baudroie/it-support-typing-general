@@ -1,0 +1,41 @@
+name: Publish GitHub Pages
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '公開するリリースのタグ'
+        required: true
+        type: string
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified static site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+        run: |
+          mkdir -p artifact public
+          gh release download "$RELEASE_TAG" --pattern site.zip --pattern site.zip.sha256 --dir artifact
+          cd artifact
+          sha256sum --check site.zip.sha256
+          unzip -q site.zip -d ../public
+          test -f ../public/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
